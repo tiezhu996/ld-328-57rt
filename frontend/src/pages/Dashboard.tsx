@@ -7,6 +7,7 @@ import FoodCard from '../components/common/FoodCard';
 import FreshnessBadge from '../components/common/FreshnessBadge';
 import RemainingDaysBar from '../components/common/RemainingDaysBar';
 import { FoodCategoryLabels } from '../constants/food';
+import { formatMoney, wasteAmount } from '../utils/money';
 
 export default function Dashboard() {
   const { currentFamily } = useFamilyStore();
@@ -61,6 +62,9 @@ export default function Dashboard() {
                     <Card size="small" title={<Space>{it.name}<FreshnessBadge status={it.status} expiryDate={it.expiry_date} /></Space>}>
                       <Space direction="vertical" size={2}>
                         <span>类别：{FoodCategoryLabels[it.category] ?? it.category}</span>
+                        <span>数量：{it.quantity} {it.unit}</span>
+                        {/* 浪费金额与统计页同一口径：剩余数量 × 当前单价（未填按 15 元/单位） */}
+                        <span style={{ color: '#ff4d4f' }}>浪费金额：¥{formatMoney(wasteAmount(it.quantity, it.unit_price))}</span>
                         <RemainingDaysBar expiryDate={it.expiry_date} />
                       </Space>
                     </Card>

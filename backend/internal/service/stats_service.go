@@ -122,13 +122,15 @@ func (s *StatsService) Statistics(ctx context.Context, userID, familyID uint, mo
 	if err != nil {
 		return nil, util.LogError(s.log, ctx, constants.LOG_STATS_REPORT, fmt.Errorf("list all foods: %w", err))
 	}
-	// 浪费金额估算：实时计算新鲜度，仅统计已过期食品（按平均单价 15 元/单位估算）
+	// 浪费金额估算：实时计算新鲜度，仅统计已过期食品。
+	// 口径：剩余数量 × 当前采购单价（未填单价按默认 15 元/单位），过期清单与导出报表共用同一口径。
 	wasteAmount := 0.0
 	topWasted := make([]model.TopFood, 0, 8)
 	for _, it := range allItems {
 		if s.calculator.ComputeFreshness(it.Status, it.ExpiryDate) == constants.FreshnessExpired {
-			wasteAmount += it.Quantity * 15
-			topWasted = append(topWasted, model.TopFood{FoodItemID: it.ID, Name: it.Name, Count: 1, Quantity: it.Quantity})
+			amount := s.calculator.WasteAmount(it.Quantity, it.UnitPrice)
+			wasteAmount = s.calculator.RoundMoney(wasteAmount + amount)
+			topWasted = append(topWasted, model.TopFood{FoodItemID: it.ID, Name: it.Name, Count: 1, Quantity: it.Quantity, Amount: amount})
 		}
 	}
 	result := &StatisticsData{

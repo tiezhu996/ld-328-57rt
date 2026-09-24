@@ -40,6 +40,10 @@ export const FreshnessStatusLabels: Record<string, string> = {
 
 export const ExpiringThresholdDays = 3;
 
+// 默认采购单价（元/单位）：与 backend/internal/constants/food.go 的 DefaultUnitPrice 保持一致。
+// 食品未填写采购单价时，浪费金额与消耗金额均按此估算。
+export const DefaultUnitPrice = 15;
+
 export const StorageLocationLabels: Record<string, string> = {
   fridge: '冰箱',
   pantry: '储藏室',

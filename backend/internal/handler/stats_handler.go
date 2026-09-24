@@ -73,6 +73,16 @@ func (h *StatsHandler) ExportPDF(c *gin.Context) {
 		pdf.Cell(0, 7, util.CategoryText(row.Category)+"  count="+strconv.FormatInt(row.Count, 10)+"  qty="+util.FormatMoney(row.TotalQuantity))
 		pdf.Ln(7)
 	}
+	// 过期浪费清单：与统计页同一口径（剩余数量 × 当前单价，未填单价按默认 15 元/单位）。
+	pdf.Ln(4)
+	pdf.SetFont("Arial", "B", 12)
+	pdf.Cell(0, 8, "Top Wasted (expired):")
+	pdf.Ln(8)
+	pdf.SetFont("Arial", "", 11)
+	for _, row := range data.TopWasted {
+		pdf.Cell(0, 7, row.Name+"  qty="+util.FormatMoney(row.Quantity)+"  waste="+util.FormatMoney(row.Amount)+" CNY")
+		pdf.Ln(7)
+	}
 	var buf bytes.Buffer
 	if err := pdf.Output(&buf); err != nil {
 		c.Error(util.InternalError("PDF 生成（Statistics）失败", err))

@@ -32,6 +32,10 @@ var FreshnessStatuses = []string{
 // ExpiringThresholdDays 临期阈值（天），与前端 utils/calculateRemainingDays.ts 保持一致。
 const ExpiringThresholdDays = 3
 
+// DefaultUnitPrice 默认采购单价（元/单位）：食品未填写采购单价时，浪费金额与消耗金额均按此估算。
+// 与前端 frontend/src/constants/food.ts 的 DefaultUnitPrice 必须保持一致。
+const DefaultUnitPrice = 15.0
+
 // StorageLocations 存放位置枚举。
 const (
 	StorageFridge   = "fridge"   // 冰箱

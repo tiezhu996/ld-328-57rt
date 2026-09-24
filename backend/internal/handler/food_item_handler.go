@@ -33,7 +33,7 @@ func (h *FoodItemHandler) Create(c *gin.Context) {
 	item, err := h.svc.Create(c.Request.Context(), userID(c), service.CreateFoodInput{
 		FamilyID: req.FamilyID, Name: req.Name, Category: req.Category,
 		ProductionDate: req.ProductionDate, ShelfLifeDays: req.ShelfLifeDays,
-		Quantity: req.Quantity, Unit: req.Unit, StorageLocation: req.StorageLocation,
+		Quantity: req.Quantity, Unit: req.Unit, UnitPrice: req.UnitPrice, StorageLocation: req.StorageLocation,
 		OpenedAt: req.OpenedAt, ImageURL: req.ImageURL,
 	})
 	if err != nil {
@@ -84,7 +84,7 @@ func (h *FoodItemHandler) Update(c *gin.Context) {
 	item, err := h.svc.Update(c.Request.Context(), userID(c), id, service.CreateFoodInput{
 		FamilyID: req.FamilyID, Name: req.Name, Category: req.Category,
 		ProductionDate: req.ProductionDate, ShelfLifeDays: req.ShelfLifeDays,
-		Quantity: req.Quantity, Unit: req.Unit, StorageLocation: req.StorageLocation,
+		Quantity: req.Quantity, Unit: req.Unit, UnitPrice: req.UnitPrice, StorageLocation: req.StorageLocation,
 		OpenedAt: req.OpenedAt, ImageURL: req.ImageURL,
 	})
 	if err != nil {

@@ -61,7 +61,7 @@ func main() {
 	familySvc := service.NewFamilyGroupService(groupRepo, memberRepo, log)
 	memberSvc := service.NewFamilyMemberService(memberRepo, log)
 	foodSvc := service.NewFoodItemService(foodRepo, consumeRepo, familySvc, calculator, log)
-	consumeSvc := service.NewConsumptionRecordService(consumeRepo, foodRepo, familySvc, log)
+	consumeSvc := service.NewConsumptionRecordService(consumeRepo, foodRepo, familySvc, calculator, log)
 	notifySvc := service.NewNotificationService(notifyRepo, familySvc, log)
 	recipeSvc := service.NewRecipeService(recipeRepo, foodRepo, familySvc, calculator, log)
 	statsSvc := service.NewStatsService(foodRepo, consumeRepo, notifyRepo, familySvc, memberSvc, calculator, log)
@@ -155,16 +155,18 @@ func migrateAndSeed(db *gorm.DB, log *slog.Logger) error {
 		return err
 	}
 	now := time.Now()
+	milkPrice, toastPrice, chickenPrice := 5.5, 8.9, 12.75
 	foods := []model.FoodItem{
-		{FamilyID: group.ID, Name: "鲜牛奶", Category: constants.FoodCategoryDairy, Quantity: 2, Unit: "盒", ShelfLifeDays: 5, StorageLocation: constants.StorageFridge, Status: constants.FreshnessFresh, CreatorID: users[0].ID, ExpiryDate: ptrTime(now.AddDate(0, 0, 2))},
-		{FamilyID: group.ID, Name: "吐司面包", Category: constants.FoodCategoryBakery, Quantity: 1, Unit: "袋", ShelfLifeDays: 3, StorageLocation: constants.StoragePantry, Status: constants.FreshnessFresh, CreatorID: users[0].ID, ExpiryDate: ptrTime(now.AddDate(0, 0, 1))},
-		{FamilyID: group.ID, Name: "鸡胸肉", Category: constants.FoodCategoryFresh, Quantity: 3, Unit: "块", ShelfLifeDays: 10, StorageLocation: constants.StorageFreezer, Status: constants.FreshnessFresh, CreatorID: users[1].ID, ExpiryDate: ptrTime(now.AddDate(0, 0, 7))},
+		{FamilyID: group.ID, Name: "鲜牛奶", Category: constants.FoodCategoryDairy, Quantity: 2, Unit: "盒", UnitPrice: &milkPrice, ShelfLifeDays: 5, StorageLocation: constants.StorageFridge, Status: constants.FreshnessFresh, CreatorID: users[0].ID, ExpiryDate: ptrTime(now.AddDate(0, 0, 2))},
+		{FamilyID: group.ID, Name: "吐司面包", Category: constants.FoodCategoryBakery, Quantity: 1, Unit: "袋", UnitPrice: &toastPrice, ShelfLifeDays: 3, StorageLocation: constants.StoragePantry, Status: constants.FreshnessFresh, CreatorID: users[0].ID, ExpiryDate: ptrTime(now.AddDate(0, 0, 1))},
+		{FamilyID: group.ID, Name: "鸡胸肉", Category: constants.FoodCategoryFresh, Quantity: 3, Unit: "块", UnitPrice: &chickenPrice, ShelfLifeDays: 10, StorageLocation: constants.StorageFreezer, Status: constants.FreshnessFresh, CreatorID: users[1].ID, ExpiryDate: ptrTime(now.AddDate(0, 0, 7))},
+		// 熟食卤味未填写采购单价：浪费金额按默认 15 元/单位估算
 		{FamilyID: group.ID, Name: "熟食卤味", Category: constants.FoodCategoryCooked, Quantity: 1, Unit: "份", ShelfLifeDays: 2, StorageLocation: constants.StorageFridge, Status: constants.FreshnessFresh, CreatorID: users[1].ID, ExpiryDate: ptrTime(now.AddDate(0, 0, -1))},
 	}
 	if err := db.Create(&foods).Error; err != nil {
 		return err
 	}
-	if err := db.Create(&model.ConsumptionRecord{FoodItemID: foods[1].ID, Quantity: 1, UserID: users[0].ID, ConsumedAt: now.Add(-24 * time.Hour)}).Error; err != nil {
+	if err := db.Create(&model.ConsumptionRecord{FoodItemID: foods[1].ID, Quantity: 1, UnitPrice: toastPrice, Amount: toastPrice, UserID: users[0].ID, ConsumedAt: now.Add(-24 * time.Hour)}).Error; err != nil {
 		return err
 	}
 	if err := db.Create(&[]model.Notification{

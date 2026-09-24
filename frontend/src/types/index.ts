@@ -36,6 +36,7 @@ export interface FoodItem {
   shelf_life_days: number;
   quantity: number;
   unit: string;
+  unit_price?: number | null;
   storage_location: string;
   opened_at?: string | null;
   expiry_date?: string | null;
@@ -50,6 +51,8 @@ export interface ConsumptionRecord {
   id: number;
   food_item_id: number;
   quantity: number;
+  unit_price: number;
+  amount: number;
   consumed_at: string;
   user_id: number;
   user?: User;

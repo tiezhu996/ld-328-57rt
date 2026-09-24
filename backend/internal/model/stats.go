@@ -20,4 +20,5 @@ type TopFood struct {
 	Name       string  `json:"name"`
 	Count      int64   `json:"count"`
 	Quantity   float64 `json:"quantity"`
+	Amount     float64 `json:"amount"` // 浪费金额（仅最常浪费口径：剩余数量 × 当前单价）
 }

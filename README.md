@@ -4,6 +4,13 @@
 
 面向家庭和小型餐饮的食品保质期管理工具，帮助用户记录食品入库信息、自动计算保质期剩余天数、及时提醒临期食品，减少食物浪费。支持家庭多成员共享、消耗记录、分类统计报表与智能食谱推荐。
 
+## 采购单价与浪费金额口径
+
+- 食品可填写**采购单价**（元/单位，不能为负、最多两位小数）；录入/编辑表单可填写，列表、详情与食品卡片均可查看。
+- 未填写单价时，所有金额估算继续按默认 **15 元/单位** 计算（前后端常量：`backend/internal/constants/food.go` 的 `DefaultUnitPrice` 与 `frontend/src/constants/food.ts` 的 `DefaultUnitPrice`）。
+- 记录消耗时，消耗记录会**快照当时的单价与本笔金额**（`consumption_records.unit_price` / `amount`），之后修改食品价格不影响历史消耗。
+- 统计页浪费金额、看板过期清单与 PDF 导出报表统一口径：**剩余数量 × 当前单价**（未填按 15 元/单位）。
+
 ## 快速启动（Docker Compose 一键部署，首选）
 
 ```bash
@@ -74,7 +81,7 @@ ld-328/
 │       ├── hooks/            # useFreshnessStats/usePagination
 │       ├── pages/            # Dashboard/FoodManage/ConsumptionManage/Statistics/FamilyManage/Recommendations/Profile/Login
 │       ├── router/           # index.tsx + guards.tsx
-│       ├── utils/            # calculateRemainingDays/dateFormat/request
+│       ├── utils/            # calculateRemainingDays/dateFormat/money/request
 │       └── constants/        # food/user/errorCodes
 └── backend/
     ├── cmd/server/main.go    # 入口：装配依赖、启动 Gin 与临期扫描

@@ -14,15 +14,16 @@ import (
 
 // ConsumptionRecordService 消耗记录服务：历史查询与频率分析。
 type ConsumptionRecordService struct {
-	repo      *repository.ConsumptionRecordRepository
-	foodRepo  *repository.FoodItemRepository
-	familySvc *FamilyGroupService
-	log       *slog.Logger
+	repo       *repository.ConsumptionRecordRepository
+	foodRepo   *repository.FoodItemRepository
+	familySvc  *FamilyGroupService
+	calculator *util.FoodCalculator
+	log        *slog.Logger
 }
 
 // NewConsumptionRecordService 构造消耗记录服务。
-func NewConsumptionRecordService(repo *repository.ConsumptionRecordRepository, foodRepo *repository.FoodItemRepository, familySvc *FamilyGroupService, log *slog.Logger) *ConsumptionRecordService {
-	return &ConsumptionRecordService{repo: repo, foodRepo: foodRepo, familySvc: familySvc, log: log}
+func NewConsumptionRecordService(repo *repository.ConsumptionRecordRepository, foodRepo *repository.FoodItemRepository, familySvc *FamilyGroupService, calculator *util.FoodCalculator, log *slog.Logger) *ConsumptionRecordService {
+	return &ConsumptionRecordService{repo: repo, foodRepo: foodRepo, familySvc: familySvc, calculator: calculator, log: log}
 }
 
 // List 分页查询家庭消耗记录。
@@ -75,11 +76,20 @@ type ConsumptionAnalysis struct {
 }
 
 // Record 直接创建消耗记录（供 Consume 流程之外的补录）。
+// 同样快照当前有效单价与本笔金额，之后修改食品价格不影响本记录。
 func (s *ConsumptionRecordService) Record(ctx context.Context, foodID, userID uint, quantity float64, consumedAt time.Time) (*model.ConsumptionRecord, error) {
-	record := &model.ConsumptionRecord{FoodItemID: foodID, Quantity: quantity, UserID: userID, ConsumedAt: consumedAt}
+	item, err := s.foodRepo.FindByID(foodID)
+	if err != nil {
+		return nil, util.NotFoundError("食品（FoodItem）不存在", err)
+	}
+	unitPrice := s.calculator.ResolveUnitPrice(item.UnitPrice)
+	record := &model.ConsumptionRecord{
+		FoodItemID: foodID, Quantity: quantity, UserID: userID, ConsumedAt: consumedAt,
+		UnitPrice: unitPrice, Amount: s.calculator.RoundMoney(quantity * unitPrice),
+	}
 	if err := s.repo.Create(record); err != nil {
 		return nil, util.LogError(s.log, ctx, constants.LOG_CONSUMPTION_RECORDED, fmt.Errorf("create consumption record: %w", err))
 	}
-	s.log.InfoContext(ctx, constants.LOG_CONSUMPTION_RECORDED, "food_id", foodID, "quantity", quantity)
+	s.log.InfoContext(ctx, constants.LOG_CONSUMPTION_RECORDED, "food_id", foodID, "quantity", quantity, "unit_price", record.UnitPrice, "amount", record.Amount)
 	return record, nil
 }

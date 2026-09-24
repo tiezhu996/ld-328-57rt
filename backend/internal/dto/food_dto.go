@@ -11,6 +11,7 @@ type CreateFoodRequest struct {
 	ShelfLifeDays   int        `json:"shelf_life_days"`
 	Quantity        float64    `json:"quantity" binding:"gte=0"`
 	Unit            string     `json:"unit"`
+	UnitPrice       *float64   `json:"unit_price" binding:"omitempty,gte=0"` // 采购单价（元/单位），不传/传 null 表示未填写
 	StorageLocation string     `json:"storage_location"`
 	OpenedAt        *time.Time `json:"opened_at"`
 	ImageURL        string     `json:"image_url"`

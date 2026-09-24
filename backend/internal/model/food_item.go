@@ -12,6 +12,7 @@ type FoodItem struct {
 	ShelfLifeDays   int        `json:"shelf_life_days"`
 	Quantity        float64    `json:"quantity"`
 	Unit            string     `gorm:"size:20" json:"unit"`
+	UnitPrice       *float64   `gorm:"column:unit_price" json:"unit_price"` // 采购单价（元/单位），nil 表示未填写，按默认单价估算
 	StorageLocation string     `gorm:"size:20" json:"storage_location"`
 	OpenedAt        *time.Time `json:"opened_at"`
 	ExpiryDate      *time.Time `json:"expiry_date"`

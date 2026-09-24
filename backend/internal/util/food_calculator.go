@@ -1,6 +1,7 @@
 package util
 
 import (
+	"math"
 	"time"
 
 	"github.com/blueship581/cyfreshfood/internal/constants"
@@ -56,4 +57,23 @@ func (c *FoodCalculator) ComputeFreshness(status string, expiryDate *time.Time) 
 	default:
 		return constants.FreshnessFresh
 	}
+}
+
+// ResolveUnitPrice 解析有效采购单价：未填写（nil）时按默认单价 15 元/单位估算。
+func (c *FoodCalculator) ResolveUnitPrice(unitPrice *float64) float64 {
+	if unitPrice == nil {
+		return constants.DefaultUnitPrice
+	}
+	return *unitPrice
+}
+
+// RoundMoney 金额四舍五入保留两位小数。
+func (c *FoodCalculator) RoundMoney(v float64) float64 {
+	return math.Round(v*100) / 100
+}
+
+// WasteAmount 浪费金额 = 剩余数量 × 当前有效单价（未填单价按默认 15 元/单位），保留两位小数。
+// 统计页、过期清单与导出报表必须统一走本口径。
+func (c *FoodCalculator) WasteAmount(quantity float64, unitPrice *float64) float64 {
+	return c.RoundMoney(quantity * c.ResolveUnitPrice(unitPrice))
 }

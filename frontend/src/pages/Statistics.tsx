@@ -7,6 +7,7 @@ import { useFamilyStore } from '../stores/familyStore';
 import { exportStatisticsPDF, getStatistics, type StatisticsData } from '../api/stats';
 import EmptyState from '../components/common/EmptyState';
 import { FoodCategoryLabels } from '../constants/food';
+import { formatMoney } from '../utils/money';
 import dayjs from 'dayjs';
 import { currentMonth } from '../utils/dateFormat';
 
@@ -43,6 +44,13 @@ export default function Statistics() {
     { title: '数量', dataIndex: 'quantity' },
   ];
 
+  // 最常浪费清单与浪费金额同一口径：剩余数量 × 当前单价（未填按 15 元/单位）。
+  const wastedColumns = [
+    { title: '食品名称', dataIndex: 'name' },
+    { title: '剩余数量', dataIndex: 'quantity' },
+    { title: '浪费金额（元）', dataIndex: 'amount', render: (v: number) => formatMoney(v ?? 0) },
+  ];
+
   return (
     <SpaceV>
       <Row gutter={16}>
@@ -61,7 +69,7 @@ export default function Statistics() {
             <div style={{ fontWeight: 600, marginBottom: 8 }}>最常购买 Top 10</div>
             <Table size="small" rowKey={(r) => String(r.food_item_id)} columns={columns} dataSource={data?.top_purchased ?? []} pagination={false} locale={{ emptyText: <EmptyState description="暂无数据" /> }} />
             <div style={{ fontWeight: 600, margin: '12px 0 8px' }}>最常浪费 Top 10</div>
-            <Table size="small" rowKey={(r) => String(r.food_item_id)} columns={columns} dataSource={data?.top_wasted ?? []} pagination={false} locale={{ emptyText: <EmptyState description="暂无数据" /> }} />
+            <Table size="small" rowKey={(r) => String(r.food_item_id)} columns={wastedColumns} dataSource={data?.top_wasted ?? []} pagination={false} locale={{ emptyText: <EmptyState description="暂无数据" /> }} />
           </Col>
         </Row>
       </Card>
