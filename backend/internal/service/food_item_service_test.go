@@ -49,6 +49,10 @@ func TestFoodItemService_Consume(t *testing.T) {
 	if record.Quantity != 1.5 {
 		t.Fatalf("record quantity = %v, want 1.5", record.Quantity)
 	}
+	// 未填单价时按默认 15 元/单位快照金额。
+	if record.UnitPrice != 15 || record.Amount != 22.5 {
+		t.Fatalf("record price snapshot = (%v, %v), want (15, 22.5)", record.UnitPrice, record.Amount)
+	}
 
 	got, err := foodRepo.FindByID(item.ID)
 	if err != nil {
@@ -71,4 +75,86 @@ func TestFoodItemService_Consume(t *testing.T) {
 	if _, err := svc.Consume(ctx, 1, item.ID, 0.1, time.Now()); err == nil {
 		t.Fatal("expected error for consuming consumed/empty food")
 	}
+}
+
+func TestFoodItemService_ConsumePriceSnapshot(t *testing.T) {
+	db := newTestDB(t)
+	groupRepo := repository.NewFamilyGroupRepository(db)
+	memberRepo := repository.NewFamilyMemberRepository(db)
+	foodRepo := repository.NewFoodItemRepository(db)
+	consumeRepo := repository.NewConsumptionRecordRepository(db)
+	familySvc := NewFamilyGroupService(groupRepo, memberRepo, testLogger())
+	svc := NewFoodItemService(foodRepo, consumeRepo, familySvc, util.NewFoodCalculator(), testLogger())
+	ctx := context.Background()
+
+	group, err := familySvc.Create(ctx, 1, "测试家庭")
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	item := seedFood(t, db, group.ID, 1, 3)
+	price := 10.0
+	item.PurchasePrice = &price
+	if err := db.Save(item).Error; err != nil {
+		t.Fatalf("update price: %v", err)
+	}
+
+	record, err := svc.Consume(ctx, 1, item.ID, 2, time.Now())
+	if err != nil {
+		t.Fatalf("Consume() error = %v", err)
+	}
+	if record.UnitPrice != 10 || record.Amount != 20 {
+		t.Fatalf("record price snapshot = (%v, %v), want (10, 20)", record.UnitPrice, record.Amount)
+	}
+
+	// 修改食品价格后，历史消耗记录的单价与金额不变。
+	newPrice := 99.0
+	if _, err := svc.Update(ctx, 1, item.ID, CreateFoodInput{PurchasePrice: &newPrice}); err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	got, err := consumeRepo.ListByFood(item.ID)
+	if err != nil || len(got) != 1 {
+		t.Fatalf("ListByFood() = %v, %d", err, len(got))
+	}
+	if got[0].UnitPrice != 10 || got[0].Amount != 20 {
+		t.Fatalf("history record changed after price update = (%v, %v), want (10, 20)", got[0].UnitPrice, got[0].Amount)
+	}
+}
+
+func TestFoodItemService_PurchasePriceValidation(t *testing.T) {
+	db := newTestDB(t)
+	groupRepo := repository.NewFamilyGroupRepository(db)
+	memberRepo := repository.NewFamilyMemberRepository(db)
+	foodRepo := repository.NewFoodItemRepository(db)
+	consumeRepo := repository.NewConsumptionRecordRepository(db)
+	familySvc := NewFamilyGroupService(groupRepo, memberRepo, testLogger())
+	svc := NewFoodItemService(foodRepo, consumeRepo, familySvc, util.NewFoodCalculator(), testLogger())
+	ctx := context.Background()
+
+	group, err := familySvc.Create(ctx, 1, "测试家庭")
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	base := CreateFoodInput{FamilyID: group.ID, Name: "测试食品", Category: constants.FoodCategoryDairy, Quantity: 1}
+
+	negative := -1.0
+	if _, err := svc.Create(ctx, 1, withPrice(base, &negative)); err == nil {
+		t.Fatal("expected error for negative price")
+	}
+	threeDecimals := 9.999
+	if _, err := svc.Create(ctx, 1, withPrice(base, &threeDecimals)); err == nil {
+		t.Fatal("expected error for more than two decimals")
+	}
+	valid := 9.99
+	item, err := svc.Create(ctx, 1, withPrice(base, &valid))
+	if err != nil {
+		t.Fatalf("Create() with valid price error = %v", err)
+	}
+	if item.PurchasePrice == nil || *item.PurchasePrice != 9.99 {
+		t.Fatalf("purchase_price = %v, want 9.99", item.PurchasePrice)
+	}
+}
+
+func withPrice(in CreateFoodInput, price *float64) CreateFoodInput {
+	in.PurchasePrice = price
+	return in
 }

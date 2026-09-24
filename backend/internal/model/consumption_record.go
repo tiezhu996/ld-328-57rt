@@ -7,6 +7,8 @@ type ConsumptionRecord struct {
 	ID         uint      `gorm:"primaryKey" json:"id"`
 	FoodItemID uint      `gorm:"index;not null" json:"food_item_id"`
 	Quantity   float64   `json:"quantity"`
+	UnitPrice  float64   `json:"unit_price"`
+	Amount     float64   `json:"amount"`
 	ConsumedAt time.Time `json:"consumed_at"`
 	UserID     uint      `gorm:"index" json:"user_id"`
 	CreatedAt  time.Time `json:"created_at"`

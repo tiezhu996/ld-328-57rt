@@ -1,6 +1,6 @@
 import { Card, Space, Typography } from 'antd';
 import type { FoodItem } from '../../types';
-import { FoodCategoryLabels, StorageLocationLabels } from '../../constants/food';
+import { FoodCategoryLabels, StorageLocationLabels, effectiveUnitPrice, formatPrice } from '../../constants/food';
 import FreshnessBadge from './FreshnessBadge';
 import RemainingDaysBar from './RemainingDaysBar';
 
@@ -23,6 +23,7 @@ export default function FoodCard({ item, onClick }: Props) {
       <Space direction="vertical" size={2} style={{ width: '100%' }}>
         <Text type="secondary">类别：{FoodCategoryLabels[item.category] ?? item.category}</Text>
         <Text type="secondary">数量：{item.quantity} {item.unit}</Text>
+        <Text type="secondary">单价：{formatPrice(effectiveUnitPrice(item.purchase_price))} 元/{item.unit}{item.purchase_price == null ? '（默认）' : ''}</Text>
         <Text type="secondary">存放：{StorageLocationLabels[item.storage_location] ?? item.storage_location}</Text>
         <RemainingDaysBar expiryDate={item.expiry_date} />
       </Space>

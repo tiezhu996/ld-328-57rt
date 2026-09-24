@@ -1,6 +1,7 @@
 package util
 
 import (
+	"math"
 	"time"
 
 	"github.com/blueship581/cyfreshfood/internal/constants"
@@ -56,4 +57,25 @@ func (c *FoodCalculator) ComputeFreshness(status string, expiryDate *time.Time) 
 	default:
 		return constants.FreshnessFresh
 	}
+}
+
+// ValidateUnitPrice 校验采购单价：不能为负，最多保留两位小数。
+func (c *FoodCalculator) ValidateUnitPrice(price float64) bool {
+	if price < 0 {
+		return false
+	}
+	return math.Abs(price*100-math.Round(price*100)) < 1e-9
+}
+
+// EffectiveUnitPrice 有效采购单价：未填写时按默认单价（15 元/单位）计算。
+func (c *FoodCalculator) EffectiveUnitPrice(price *float64) float64 {
+	if price == nil {
+		return constants.DefaultUnitPrice
+	}
+	return *price
+}
+
+// Amount 金额估算：数量 × 有效单价，保留两位小数（消耗快照与浪费统计共用同一口径）。
+func (c *FoodCalculator) Amount(quantity float64, price *float64) float64 {
+	return math.Round(quantity*c.EffectiveUnitPrice(price)*100) / 100
 }

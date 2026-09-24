@@ -155,6 +155,13 @@ ld-328/
 
 > 除 `/healthz` 与注册/登录外，其余接口需携带 `Authorization: Bearer <JWT>`；响应统一为 `{code, message, data}`，请求日志与响应头包含 `X-Request-ID`。
 
+## 采购单价与浪费金额口径
+
+- 食品支持 `purchase_price`（采购单价，元/单位）：录入、编辑（含 CSV 第 7 列）可填写，列表与详情可查看；不能为负，最多保留两位小数。
+- 未填写单价时，所有金额估算按默认 **15 元/单位** 计算（前后端常量 `DefaultUnitPrice` 保持一致）。
+- 记录消耗时会把**当时单价**与**这笔金额**快照进消耗记录（`unit_price` / `amount`），之后修改食品价格不影响历史消耗。
+- 统计页浪费金额 = 过期食品**剩余数量 × 当前单价**；看板过期清单、最常浪费 Top 10 与 PDF 导出报表沿用同一口径。
+
 ## 枚举出现位置清单
 
 ### FoodCategory（食品类别：fresh/dairy/cooked/bakery/frozen/other）

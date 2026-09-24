@@ -41,9 +41,19 @@ type CreateFoodInput struct {
 	ShelfLifeDays   int        `json:"shelf_life_days"`
 	Quantity        float64    `json:"quantity" binding:"gte=0"`
 	Unit            string     `json:"unit"`
+	PurchasePrice   *float64   `json:"purchase_price"`
 	StorageLocation string     `json:"storage_location"`
 	OpenedAt        *time.Time `json:"opened_at"`
 	ImageURL        string     `json:"image_url"`
+}
+
+// validatePurchasePrice 校验采购单价（不能为负、最多两位小数），返回包装后的业务错误。
+func (s *FoodItemService) validatePurchasePrice(price *float64) error {
+	if price != nil && !s.calculator.ValidateUnitPrice(*price) {
+		return util.NewAppError(constants.CodePriceInvalid, 400, constants.MsgPriceInvalid,
+			fmt.Errorf("FoodItem purchase_price invalid: %v", *price))
+	}
+	return nil
 }
 
 // Create 录入食品并计算到期日与状态。
@@ -54,10 +64,14 @@ func (s *FoodItemService) Create(ctx context.Context, userID uint, input CreateF
 	if !contains(constants.FoodCategories, input.Category) {
 		return nil, util.BadRequest(constants.MsgCategoryInvalid, errors.New("invalid category"))
 	}
+	if err := s.validatePurchasePrice(input.PurchasePrice); err != nil {
+		return nil, err
+	}
 	item := &model.FoodItem{
 		FamilyID: input.FamilyID, Name: input.Name, Category: input.Category,
 		ProductionDate: input.ProductionDate, ShelfLifeDays: input.ShelfLifeDays,
-		Quantity: input.Quantity, Unit: input.Unit, StorageLocation: input.StorageLocation,
+		Quantity: input.Quantity, Unit: input.Unit, PurchasePrice: input.PurchasePrice,
+		StorageLocation: input.StorageLocation,
 		OpenedAt: input.OpenedAt, ImageURL: input.ImageURL, CreatorID: userID,
 	}
 	item.ExpiryDate = s.calculator.CalculateExpiryDate(item.ProductionDate, item.ShelfLifeDays, item.OpenedAt)
@@ -130,6 +144,11 @@ func (s *FoodItemService) Update(ctx context.Context, userID, id uint, input Cre
 	if input.Unit != "" {
 		item.Unit = input.Unit
 	}
+	if err := s.validatePurchasePrice(input.PurchasePrice); err != nil {
+		return nil, err
+	}
+	// 采购单价全量更新：传 null/未填表示清除，回到默认 15 元/单位口径。
+	item.PurchasePrice = input.PurchasePrice
 	if input.StorageLocation != "" {
 		item.StorageLocation = input.StorageLocation
 	}
@@ -185,7 +204,12 @@ func (s *FoodItemService) Consume(ctx context.Context, userID, foodID uint, quan
 	if item.Quantity == 0 {
 		item.Status = constants.FreshnessConsumed
 	}
-	record := &model.ConsumptionRecord{FoodItemID: foodID, Quantity: quantity, UserID: userID, ConsumedAt: consumedAt}
+	// 快照当前单价与这笔金额：之后修改食品价格不影响历史消耗记录。
+	unitPrice := s.calculator.EffectiveUnitPrice(item.PurchasePrice)
+	record := &model.ConsumptionRecord{
+		FoodItemID: foodID, Quantity: quantity, UserID: userID, ConsumedAt: consumedAt,
+		UnitPrice: unitPrice, Amount: s.calculator.Amount(quantity, item.PurchasePrice),
+	}
 	err = s.repo.Transaction(func(tx *gorm.DB) error {
 		if err := s.repo.WithTx(tx).Update(item); err != nil {
 			return fmt.Errorf("update food quantity: %w", err)
@@ -198,11 +222,11 @@ func (s *FoodItemService) Consume(ctx context.Context, userID, foodID uint, quan
 	if err != nil {
 		return nil, util.LogError(s.log, ctx, constants.LOG_FOOD_CONSUME_FAILED, err)
 	}
-	s.log.InfoContext(ctx, constants.LOG_FOOD_CONSUME_SUCCESS, "food_id", foodID, "quantity", quantity, "user_id", userID)
+	s.log.InfoContext(ctx, constants.LOG_FOOD_CONSUME_SUCCESS, "food_id", foodID, "quantity", quantity, "user_id", userID, "unit_price", unitPrice, "amount", record.Amount)
 	return record, nil
 }
 
-// ImportCSV CSV 批量导入（name,category,quantity,unit,shelf_life_days,storage_location）。
+// ImportCSV CSV 批量导入（name,category,quantity,unit,shelf_life_days,storage_location[,purchase_price]）。
 func (s *FoodItemService) ImportCSV(ctx context.Context, userID, familyID uint, csvText string) (int, []model.FoodItem, error) {
 	if err := s.familySvc.IsMember(ctx, familyID, userID); err != nil {
 		return 0, nil, err
@@ -249,9 +273,15 @@ func (s *FoodItemService) ImportCSV(ctx context.Context, userID, familyID uint, 
 		if len(row) > 5 && strings.TrimSpace(row[5]) != "" {
 			location = strings.TrimSpace(row[5])
 		}
+		var purchasePrice *float64
+		if len(row) > 6 && strings.TrimSpace(row[6]) != "" {
+			if v, err := strconv.ParseFloat(strings.TrimSpace(row[6]), 64); err == nil && s.calculator.ValidateUnitPrice(v) {
+				purchasePrice = &v
+			}
+		}
 		item := &model.FoodItem{
 			FamilyID: familyID, Name: name, Category: category, Quantity: quantity,
-			Unit: unit, ShelfLifeDays: days, StorageLocation: location, CreatorID: userID,
+			Unit: unit, PurchasePrice: purchasePrice, ShelfLifeDays: days, StorageLocation: location, CreatorID: userID,
 		}
 		item.ExpiryDate = s.calculator.CalculateExpiryDate(nil, days, nil)
 		item.Status = s.calculator.ComputeFreshness("", item.ExpiryDate)

@@ -7,7 +7,7 @@ import { consumeFood, createFood, deleteFood, getFoodDetail, importFoodsCSV, lis
 import type { ConsumptionRecord, FoodItem } from '../types';
 import FreshnessBadge from '../components/common/FreshnessBadge';
 import RemainingDaysBar from '../components/common/RemainingDaysBar';
-import { FoodCategories, FoodCategoryLabels, StorageLocationLabels } from '../constants/food';
+import { FoodCategories, FoodCategoryLabels, StorageLocationLabels, effectiveUnitPrice, formatPrice } from '../constants/food';
 import { formatDateTime } from '../utils/dateFormat';
 import { usePagination } from '../hooks/usePagination';
 import { useFoodStore } from '../stores/foodStore';
@@ -34,7 +34,7 @@ export default function FoodManage() {
 
   async function onSave(values: any) {
     if (!currentFamily) return;
-    const payload = { ...values, family_id: currentFamily.id, quantity: values.quantity ?? 1, shelf_life_days: values.shelf_life_days ?? 7 };
+    const payload = { ...values, family_id: currentFamily.id, quantity: values.quantity ?? 1, shelf_life_days: values.shelf_life_days ?? 7, purchase_price: values.purchase_price ?? null };
     if (editing) await updateFood(editing.id, payload);
     else await createFood(payload);
     message.success('保存成功');
@@ -67,6 +67,7 @@ export default function FoodManage() {
     { title: '食品', dataIndex: 'name' },
     { title: '类别', dataIndex: 'category', render: (v) => FoodCategoryLabels[v] ?? v },
     { title: '数量', render: (_, r) => `${r.quantity} ${r.unit}` },
+    { title: '采购单价（元）', render: (_, r) => (r.purchase_price != null ? formatPrice(r.purchase_price) : `未填（按 ${formatPrice(effectiveUnitPrice(null))} 估）`) },
     { title: '存放位置', dataIndex: 'storage_location', render: (v) => StorageLocationLabels[v] ?? v },
     { title: '状态', render: (_, r) => <FreshnessBadge status={r.status} expiryDate={r.expiry_date} /> },
     { title: '剩余', render: (_, r) => <RemainingDaysBar expiryDate={r.expiry_date} /> },
@@ -89,7 +90,7 @@ export default function FoodManage() {
           <Select placeholder="状态" allowClear style={{ width: 120 }} options={[['fresh','充裕'],['expiring','临期'],['expired','已过期'],['consumed','已消耗']].map(([value,label]) => ({ value, label }))} onChange={(v) => setFilters((f) => ({ ...f, status: v ?? '' }))} />
           <Select placeholder="存放位置" allowClear style={{ width: 130 }} options={Object.entries(StorageLocationLabels).map(([value,label]) => ({ value, label }))} onChange={(v) => setFilters((f) => ({ ...f, storage_location: v ?? '' }))} />
           <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); form.resetFields(); setOpen(true); }}>新增食品</Button>
-          <Button icon={<UploadOutlined />} onClick={() => setCsvText('示例：\n牛奶,dairy,2,盒,5,fridge\n苹果,fresh,3,个,14,pantry')}>CSV 批量导入</Button>
+          <Button icon={<UploadOutlined />} onClick={() => setCsvText('示例：\n牛奶,dairy,2,盒,5,fridge,12.5\n苹果,fresh,3,个,14,pantry')}>CSV 批量导入</Button>
         </Space>
       </Card>
 
@@ -103,6 +104,13 @@ export default function FoodManage() {
           <Form.Item name="category" label="类别" rules={[{ required: true }]}><Select options={FoodCategories.map((c) => ({ value: c, label: FoodCategoryLabels[c] }))} /></Form.Item>
           <Form.Item name="quantity" label="数量" rules={[{ required: true }]}><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>
           <Form.Item name="unit" label="单位"><Input /></Form.Item>
+          <Form.Item
+            name="purchase_price"
+            label="采购单价（元/单位，不填按 15 元估算）"
+            rules={[{ type: 'number', min: 0, message: '单价不能为负' }]}
+          >
+            <InputNumber min={0} precision={2} step={0.01} placeholder="如 12.50" style={{ width: '100%' }} />
+          </Form.Item>
           <Form.Item name="shelf_life_days" label="保质期（天）"><InputNumber min={1} style={{ width: '100%' }} /></Form.Item>
           <Form.Item name="storage_location" label="存放位置"><Select options={Object.entries(StorageLocationLabels).map(([value,label]) => ({ value, label }))} /></Form.Item>
           <Button type="primary" htmlType="submit" block>保存</Button>
@@ -117,13 +125,16 @@ export default function FoodManage() {
               <Col span={8}>类别：{FoodCategoryLabels[detail.item.category]}</Col>
               <Col span={8}><FreshnessBadge status={detail.item.status} expiryDate={detail.item.expiry_date} /></Col>
             </Row>
+            <Row gutter={16}>
+              <Col span={24}>采购单价：{detail.item.purchase_price != null ? `${formatPrice(detail.item.purchase_price)} 元/${detail.item.unit}` : `未填写（按 ${formatPrice(effectiveUnitPrice(null))} 元/${detail.item.unit} 估算）`}</Col>
+            </Row>
             <Space>
               <InputNumber min={0.1} value={consumeQty} onChange={(v) => setConsumeQty(v ?? 1)} />
               <Button type="primary" onClick={() => onConsume(detail.item)}>记录消耗</Button>
             </Space>
             <Card size="small" title="历史消耗记录">
               {detail.consumption_records.length ? detail.consumption_records.map((r) => (
-                <div key={r.id}>{formatDateTime(r.consumed_at)} - {r.quantity} {detail.item.unit}（{r.user?.name || r.user?.phone}）</div>
+                <div key={r.id}>{formatDateTime(r.consumed_at)} - {r.quantity} {detail.item.unit} × {formatPrice(r.unit_price)} 元 = {formatPrice(r.amount)} 元（{r.user?.name || r.user?.phone}）</div>
               )) : <span style={{ color: '#999' }}>暂无消耗记录</span>}
             </Card>
           </Space>
@@ -131,7 +142,7 @@ export default function FoodManage() {
       </Modal>
 
       <Modal open={!!csvText} title="CSV 批量导入" onOk={onImport} onCancel={() => setCsvText('')} okText="导入">
-        <Input.TextArea rows={8} value={csvText} onChange={(e) => setCsvText(e.target.value)} placeholder="name,category,quantity,unit,shelf_life_days,storage_location" />
+        <Input.TextArea rows={8} value={csvText} onChange={(e) => setCsvText(e.target.value)} placeholder="name,category,quantity,unit,shelf_life_days,storage_location[,purchase_price]" />
       </Modal>
     </Space>
   );

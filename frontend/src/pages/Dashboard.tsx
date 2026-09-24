@@ -6,7 +6,7 @@ import { getDashboard, type DashboardData } from '../api/stats';
 import FoodCard from '../components/common/FoodCard';
 import FreshnessBadge from '../components/common/FreshnessBadge';
 import RemainingDaysBar from '../components/common/RemainingDaysBar';
-import { FoodCategoryLabels } from '../constants/food';
+import { FoodCategoryLabels, effectiveUnitPrice, formatPrice } from '../constants/food';
 
 export default function Dashboard() {
   const { currentFamily } = useFamilyStore();
@@ -61,6 +61,7 @@ export default function Dashboard() {
                     <Card size="small" title={<Space>{it.name}<FreshnessBadge status={it.status} expiryDate={it.expiry_date} /></Space>}>
                       <Space direction="vertical" size={2}>
                         <span>类别：{FoodCategoryLabels[it.category] ?? it.category}</span>
+                        <span>浪费金额：{formatPrice(it.quantity * effectiveUnitPrice(it.purchase_price))} 元（{it.quantity} {it.unit} × {formatPrice(effectiveUnitPrice(it.purchase_price))} 元）</span>
                         <RemainingDaysBar expiryDate={it.expiry_date} />
                       </Space>
                     </Card>

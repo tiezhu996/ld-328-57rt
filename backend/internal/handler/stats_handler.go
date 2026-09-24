@@ -66,6 +66,15 @@ func (h *StatsHandler) ExportPDF(c *gin.Context) {
 	pdf.Cell(0, 8, "Waste Amount Estimate: "+util.FormatMoney(data.WasteAmount)+" CNY")
 	pdf.Ln(10)
 	pdf.SetFont("Arial", "B", 12)
+	pdf.Cell(0, 8, "Expired Items (Waste List):")
+	pdf.Ln(8)
+	pdf.SetFont("Arial", "", 11)
+	for _, w := range data.TopWasted {
+		pdf.Cell(0, 7, w.Name+"  qty="+util.FormatMoney(w.Quantity)+"  amount="+util.FormatMoney(w.Amount)+" CNY")
+		pdf.Ln(7)
+	}
+	pdf.Ln(4)
+	pdf.SetFont("Arial", "B", 12)
 	pdf.Cell(0, 8, "Category Share:")
 	pdf.Ln(8)
 	pdf.SetFont("Arial", "", 11)

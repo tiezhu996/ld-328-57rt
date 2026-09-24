@@ -18,7 +18,7 @@ export interface StatisticsData {
   category_share: { category: string; count: number; total_quantity: number }[];
   consumption_share: { category: string; count: number; total_quantity: number }[];
   top_purchased: { food_item_id: number; name: string; count: number; quantity: number }[];
-  top_wasted: { food_item_id: number; name: string; count: number; quantity: number }[];
+  top_wasted: { food_item_id: number; name: string; count: number; quantity: number; amount: number }[];
   waste_amount: number;
   month: string;
 }

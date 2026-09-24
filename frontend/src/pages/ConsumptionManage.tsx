@@ -6,7 +6,7 @@ import { consumptionAnalysis, listConsumptions, type ConsumptionAnalysis } from 
 import type { ConsumptionRecord } from '../types';
 import FreshnessBadge from '../components/common/FreshnessBadge';
 import EmptyState from '../components/common/EmptyState';
-import { FoodCategoryLabels } from '../constants/food';
+import { FoodCategoryLabels, formatPrice } from '../constants/food';
 import { currentMonth, formatDateTime } from '../utils/dateFormat';
 import { usePagination } from '../hooks/usePagination';
 
@@ -38,6 +38,8 @@ export default function ConsumptionManage() {
     { title: '食品', render: (_, r) => r.food_item?.name ?? '-' },
     { title: '数量', dataIndex: 'quantity' },
     { title: '单位', render: (_, r) => r.food_item?.unit ?? '-' },
+    { title: '当时单价（元）', dataIndex: 'unit_price', render: (v) => formatPrice(v ?? 0) },
+    { title: '金额（元）', dataIndex: 'amount', render: (v) => formatPrice(v ?? 0) },
     { title: '状态', render: (_, r) => <FreshnessBadge status="consumed" /> },
     { title: '消耗时间', dataIndex: 'consumed_at', render: (v) => formatDateTime(v) },
     { title: '操作人', render: (_, r) => r.user?.name || r.user?.phone || '-' },

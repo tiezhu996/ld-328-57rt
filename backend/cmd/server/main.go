@@ -112,7 +112,8 @@ func migrateAndSeed(db *gorm.DB, log *slog.Logger) error {
 		return err
 	}
 	if tableCount > 0 {
-		return nil // init.sql 已初始化
+		// init.sql 已初始化：补充历史库缺失的列（采购单价与消耗金额快照）。
+		return migratePriceColumns(db)
 	}
 	if err := db.AutoMigrate(
 		&model.User{}, &model.FamilyGroup{}, &model.FamilyMember{},
@@ -155,16 +156,17 @@ func migrateAndSeed(db *gorm.DB, log *slog.Logger) error {
 		return err
 	}
 	now := time.Now()
+	milkPrice, breadPrice, chickenPrice := 12.5, 8.8, 25.8
 	foods := []model.FoodItem{
-		{FamilyID: group.ID, Name: "鲜牛奶", Category: constants.FoodCategoryDairy, Quantity: 2, Unit: "盒", ShelfLifeDays: 5, StorageLocation: constants.StorageFridge, Status: constants.FreshnessFresh, CreatorID: users[0].ID, ExpiryDate: ptrTime(now.AddDate(0, 0, 2))},
-		{FamilyID: group.ID, Name: "吐司面包", Category: constants.FoodCategoryBakery, Quantity: 1, Unit: "袋", ShelfLifeDays: 3, StorageLocation: constants.StoragePantry, Status: constants.FreshnessFresh, CreatorID: users[0].ID, ExpiryDate: ptrTime(now.AddDate(0, 0, 1))},
-		{FamilyID: group.ID, Name: "鸡胸肉", Category: constants.FoodCategoryFresh, Quantity: 3, Unit: "块", ShelfLifeDays: 10, StorageLocation: constants.StorageFreezer, Status: constants.FreshnessFresh, CreatorID: users[1].ID, ExpiryDate: ptrTime(now.AddDate(0, 0, 7))},
+		{FamilyID: group.ID, Name: "鲜牛奶", Category: constants.FoodCategoryDairy, Quantity: 2, Unit: "盒", PurchasePrice: &milkPrice, ShelfLifeDays: 5, StorageLocation: constants.StorageFridge, Status: constants.FreshnessFresh, CreatorID: users[0].ID, ExpiryDate: ptrTime(now.AddDate(0, 0, 2))},
+		{FamilyID: group.ID, Name: "吐司面包", Category: constants.FoodCategoryBakery, Quantity: 1, Unit: "袋", PurchasePrice: &breadPrice, ShelfLifeDays: 3, StorageLocation: constants.StoragePantry, Status: constants.FreshnessFresh, CreatorID: users[0].ID, ExpiryDate: ptrTime(now.AddDate(0, 0, 1))},
+		{FamilyID: group.ID, Name: "鸡胸肉", Category: constants.FoodCategoryFresh, Quantity: 3, Unit: "块", PurchasePrice: &chickenPrice, ShelfLifeDays: 10, StorageLocation: constants.StorageFreezer, Status: constants.FreshnessFresh, CreatorID: users[1].ID, ExpiryDate: ptrTime(now.AddDate(0, 0, 7))},
 		{FamilyID: group.ID, Name: "熟食卤味", Category: constants.FoodCategoryCooked, Quantity: 1, Unit: "份", ShelfLifeDays: 2, StorageLocation: constants.StorageFridge, Status: constants.FreshnessFresh, CreatorID: users[1].ID, ExpiryDate: ptrTime(now.AddDate(0, 0, -1))},
 	}
 	if err := db.Create(&foods).Error; err != nil {
 		return err
 	}
-	if err := db.Create(&model.ConsumptionRecord{FoodItemID: foods[1].ID, Quantity: 1, UserID: users[0].ID, ConsumedAt: now.Add(-24 * time.Hour)}).Error; err != nil {
+	if err := db.Create(&model.ConsumptionRecord{FoodItemID: foods[1].ID, Quantity: 1, UnitPrice: breadPrice, Amount: breadPrice, UserID: users[0].ID, ConsumedAt: now.Add(-24 * time.Hour)}).Error; err != nil {
 		return err
 	}
 	if err := db.Create(&[]model.Notification{
@@ -187,3 +189,29 @@ func migrateAndSeed(db *gorm.DB, log *slog.Logger) error {
 }
 
 func ptrTime(t time.Time) *time.Time { return &t }
+
+// migratePriceColumns 为历史数据库补充采购单价与消耗金额快照列（幂等）。
+// 历史消耗记录在列首次新增时按默认 15 元/单位回填快照，保持与旧口径一致。
+func migratePriceColumns(db *gorm.DB) error {
+	if err := db.Exec("ALTER TABLE food_items ADD COLUMN IF NOT EXISTS purchase_price DOUBLE PRECISION").Error; err != nil {
+		return fmt.Errorf("migrate price columns: %w", err)
+	}
+	var hasUnitPrice int64
+	if err := db.Raw("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='consumption_records' AND column_name='unit_price'").Scan(&hasUnitPrice).Error; err != nil {
+		return fmt.Errorf("migrate price columns: %w", err)
+	}
+	if hasUnitPrice > 0 {
+		return nil
+	}
+	stmts := []string{
+		"ALTER TABLE consumption_records ADD COLUMN IF NOT EXISTS unit_price DOUBLE PRECISION DEFAULT 0",
+		"ALTER TABLE consumption_records ADD COLUMN IF NOT EXISTS amount DOUBLE PRECISION DEFAULT 0",
+		fmt.Sprintf("UPDATE consumption_records SET unit_price = %v, amount = ROUND((quantity * %v)::numeric, 2)", constants.DefaultUnitPrice, constants.DefaultUnitPrice),
+	}
+	for _, stmt := range stmts {
+		if err := db.Exec(stmt).Error; err != nil {
+			return fmt.Errorf("migrate price columns: %w", err)
+		}
+	}
+	return nil
+}

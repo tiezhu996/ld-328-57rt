@@ -23,6 +23,7 @@ const (
 	MsgFoodConsumeFailed    = "食品（FoodItem）消耗失败：数量超出库存"
 	MsgFoodNotAvailable     = "食品（FoodItem）已消耗或不存在，无法操作"
 	MsgCategoryInvalid      = "食品类别（FoodCategory）不合法"
+	MsgPriceInvalid         = "采购单价（FoodItem.purchase_price）不能为负，且最多保留两位小数"
 	MsgStatusInvalid        = "新鲜度状态（FreshnessStatus）不合法"
 	MsgDuplicatePhone       = "手机号（User.phone）已注册"
 	MsgLoginFailed          = "手机号或密码（User）错误"

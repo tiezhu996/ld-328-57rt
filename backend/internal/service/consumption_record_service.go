@@ -77,9 +77,18 @@ type ConsumptionAnalysis struct {
 // Record 直接创建消耗记录（供 Consume 流程之外的补录）。
 func (s *ConsumptionRecordService) Record(ctx context.Context, foodID, userID uint, quantity float64, consumedAt time.Time) (*model.ConsumptionRecord, error) {
 	record := &model.ConsumptionRecord{FoodItemID: foodID, Quantity: quantity, UserID: userID, ConsumedAt: consumedAt}
+	// 快照当前单价与金额：之后修改食品价格不影响历史消耗记录。
+	if item, err := s.foodRepo.FindByID(foodID); err == nil {
+		calculator := util.NewFoodCalculator()
+		record.UnitPrice = calculator.EffectiveUnitPrice(item.PurchasePrice)
+		record.Amount = calculator.Amount(quantity, item.PurchasePrice)
+	} else {
+		record.UnitPrice = constants.DefaultUnitPrice
+		record.Amount = util.NewFoodCalculator().Amount(quantity, nil)
+	}
 	if err := s.repo.Create(record); err != nil {
 		return nil, util.LogError(s.log, ctx, constants.LOG_CONSUMPTION_RECORDED, fmt.Errorf("create consumption record: %w", err))
 	}
-	s.log.InfoContext(ctx, constants.LOG_CONSUMPTION_RECORDED, "food_id", foodID, "quantity", quantity)
+	s.log.InfoContext(ctx, constants.LOG_CONSUMPTION_RECORDED, "food_id", foodID, "quantity", quantity, "unit_price", record.UnitPrice, "amount", record.Amount)
 	return record, nil
 }

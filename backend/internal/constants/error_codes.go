@@ -13,6 +13,7 @@ const (
 	CodeInternalError    = 1007
 	CodeFoodNotAvailable = 1101
 	CodeQuantityExceeds  = 1102
+	CodePriceInvalid     = 1103
 	CodeFamilyNotMember  = 1201
 	CodeFamilyFull       = 1202
 	CodeDuplicatePhone   = 1301

@@ -8,4 +8,5 @@ export const ErrorCodes = {
   VALIDATION_ERROR: 1005,
   RATE_LIMITED: 1006,
   INTERNAL_ERROR: 1007,
+  PRICE_INVALID: 1103,
 } as const;

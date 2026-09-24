@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS food_items (
     shelf_life_days INT DEFAULT 0,
     quantity DOUBLE PRECISION DEFAULT 0,
     unit VARCHAR(20) DEFAULT '份',
+    purchase_price DOUBLE PRECISION,
     storage_location VARCHAR(20) DEFAULT 'fridge',
     opened_at TIMESTAMPTZ,
     expiry_date TIMESTAMPTZ,
@@ -55,6 +56,8 @@ CREATE TABLE IF NOT EXISTS consumption_records (
     id BIGSERIAL PRIMARY KEY,
     food_item_id BIGINT NOT NULL,
     quantity DOUBLE PRECISION DEFAULT 0,
+    unit_price DOUBLE PRECISION DEFAULT 0,
+    amount DOUBLE PRECISION DEFAULT 0,
     consumed_at TIMESTAMPTZ DEFAULT now(),
     user_id BIGINT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now(),
@@ -103,15 +106,15 @@ FROM users u JOIN family_groups g ON g.invite_code='FAMILY01'
 WHERE u.phone IN ('13800000001','13800000002')
 ON CONFLICT (family_id, user_id) DO NOTHING;
 
-INSERT INTO food_items (family_id, name, category, quantity, unit, shelf_life_days, storage_location, expiry_date, status, creator_id)
-SELECT g.id, f.name, f.category, f.quantity, f.unit, f.shelf_life_days, f.storage_location, now() + (f.days || ' days')::interval, f.status, u.id
+INSERT INTO food_items (family_id, name, category, quantity, unit, purchase_price, shelf_life_days, storage_location, expiry_date, status, creator_id)
+SELECT g.id, f.name, f.category, f.quantity, f.unit, f.purchase_price, f.shelf_life_days, f.storage_location, now() + (f.days || ' days')::interval, f.status, u.id
 FROM family_groups g
 CROSS JOIN (VALUES
-    ('鲜牛奶','dairy',2,'盒',5,'fridge',2,'fresh'),
-    ('吐司面包','bakery',1,'袋',3,'pantry',1,'fresh'),
-    ('鸡胸肉','fresh',3,'块',10,'freezer',7,'fresh'),
-    ('熟食卤味','cooked',1,'份',2,'fridge',-1,'fresh')
-) AS f(name, category, quantity, unit, shelf_life_days, storage_location, days, status)
+    ('鲜牛奶','dairy',2,'盒',12.5,5,'fridge',2,'fresh'),
+    ('吐司面包','bakery',1,'袋',8.8,3,'pantry',1,'fresh'),
+    ('鸡胸肉','fresh',3,'块',25.8,10,'freezer',7,'fresh'),
+    ('熟食卤味','cooked',1,'份',NULL,2,'fridge',-1,'fresh')
+) AS f(name, category, quantity, unit, purchase_price, shelf_life_days, storage_location, days, status)
 JOIN users u ON u.phone='13800000001'
 WHERE g.invite_code='FAMILY01';
 
